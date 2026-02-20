@@ -29,7 +29,7 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true
     },
     status: {
-      type: DataTypes.ENUM('draft', 'published', 'archived'),
+      type: DataTypes.ENUM('draft', 'pending review', 'published', 'archived', 'rejected'),
       defaultValue: 'draft'
     },
     prodi_id: {

@@ -8,6 +8,7 @@ const docTypeRoutes = require('./docTypes');
 const roleRoutes = require('./roles');
 const repositoryRoutes = require('./repositories');
 const dashboardRoutes = require('./dashboard');
+const downloadLogsRoutes = require('./downloadLogs');
 
 /**
  * @swagger
@@ -63,5 +64,6 @@ router.use('/users', userRoutes);
 router.use('/roles', roleRoutes);
 router.use('/repositories', repositoryRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/download-logs', downloadLogsRoutes);
 
 module.exports = router;

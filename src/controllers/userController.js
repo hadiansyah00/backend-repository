@@ -58,7 +58,7 @@ const getUsers = async (req, res) => {
 // @access  Private (manage_users)
 const createUser = async (req, res) => {
   try {
-    const { name, email, password, nip, role, prodi, status } = req.body;
+    const { name, email, password, nip, role, prodi, status, role_id, prodi_id } = req.body;
 
     const userExists = await db.User.findOne({ where: { email } });
     if (userExists) {
@@ -66,14 +66,19 @@ const createUser = async (req, res) => {
     }
 
     // Resolve Role ID
-    const roleRecord = await db.Role.findOne({ where: { name: role } });
-    if (!roleRecord) return res.status(400).json({ message: 'Role tidak valid' });
+    let finalRoleId = role_id;
+    if (!finalRoleId && role) {
+      const roleRecord = await db.Role.findOne({ where: { name: role } });
+      if (roleRecord) finalRoleId = roleRecord.id;
+    }
+    if (!finalRoleId) return res.status(400).json({ message: 'Role tidak valid' });
 
     // Resolve Prodi ID
-    let prodiId = null;
-    if (prodi && prodi !== 'All' && prodi !== '') {
+    let finalProdiId = prodi_id || null;
+    if (prodi_id === "") finalProdiId = null; // empty string safeguard
+    if (!finalProdiId && prodi && prodi !== 'All' && prodi !== '') {
       const prodiRecord = await db.ProgramStudi.findOne({ where: { name: prodi } });
-      if (prodiRecord) prodiId = prodiRecord.id;
+      if (prodiRecord) finalProdiId = prodiRecord.id;
     }
 
     const user = await db.User.create({
@@ -81,8 +86,8 @@ const createUser = async (req, res) => {
       email,
       password: password || '123456', // Default password jika kosong
       nip,
-      role_id: roleRecord.id,
-      prodi_id: prodiId,
+      role_id: finalRoleId,
+      prodi_id: finalProdiId,
       status: status || 'active'
     });
 
@@ -102,7 +107,7 @@ const createUser = async (req, res) => {
 // @access  Private (manage_users)
 const updateUser = async (req, res) => {
   try {
-    const { name, email, nip, role, prodi, status, password } = req.body;
+    const { name, email, nip, role, prodi, status, password, role_id, prodi_id } = req.body;
     let user = await db.User.scope('withPassword').findByPk(req.params.id);
 
     if (!user) {
@@ -116,13 +121,18 @@ const updateUser = async (req, res) => {
       user.email = email;
     }
 
-    // Role & Prodi resolution
-    if (role) {
+    // Role resolution
+    if (role_id) {
+       user.role_id = role_id;
+    } else if (role) {
       const roleRecord = await db.Role.findOne({ where: { name: role } });
       if (roleRecord) user.role_id = roleRecord.id;
     }
 
-    if (prodi !== undefined) {
+    // Prodi resolution
+    if (prodi_id !== undefined) {
+      user.prodi_id = prodi_id === "" ? null : prodi_id;
+    } else if (prodi !== undefined) {
       if (prodi === 'All' || prodi === '') {
         user.prodi_id = null;
       } else {

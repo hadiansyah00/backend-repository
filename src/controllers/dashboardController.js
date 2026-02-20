@@ -2,11 +2,43 @@ const { Repository, User, DownloadLog, ProgramStudi, sequelize } = require('../m
 
 exports.getDashboardStats = async (req, res) => {
   try {
+    const userRole = req.user?.role?.slug;
+    const userId = req.user?.id;
+
+    // --- MAHASISWA & DOSEN SPECIFIC STATS ---
+    if (userRole === 'mahasiswa' || userRole === 'dosen') {
+      const totalPublished = await Repository.count({ 
+        where: { uploaded_by: userId, status: 'published' } 
+      });
+      const pendingReview = await Repository.count({ 
+        where: { uploaded_by: userId, status: 'pending review' } 
+      });
+      const totalDrafts = await Repository.count({ 
+        where: { uploaded_by: userId, status: 'draft' } 
+      });
+      const totalRejected = await Repository.count({ 
+        where: { uploaded_by: userId, status: 'rejected' } 
+      });
+
+      return res.json({
+        success: true,
+        stats: {
+          totalPublished,
+          pendingReview,
+          totalDrafts,
+          totalRejected
+        },
+        barData: [], // Hide charts for students
+        lineData: []
+      });
+    }
+
+    // --- GLOBAL ADMIN STATS ---
     // 1. Total Published Repositories
     const totalPublished = await Repository.count({ where: { status: 'published' } });
 
-    // 2. Pending Approval Repositories (we use 'draft' as pending since there's no 'pending review' in enum)
-    const pendingReview = await Repository.count({ where: { status: 'draft' } });
+    // 2. Pending Approval Repositories
+    const pendingReview = await Repository.count({ where: { status: 'pending review' } });
 
     // 3. Total Users
     const totalUsers = await User.count();

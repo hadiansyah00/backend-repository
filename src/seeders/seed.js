@@ -63,9 +63,24 @@ const seedDatabase = async () => {
 
     console.log('🌱 Seeding Permissions...');
     const permissionsData = [
+      { name: 'view_dashboard_all', description: 'View Dashboard (All)' },
+      { name: 'view_dashboard_prodi', description: 'View Dashboard (Prodi)' },
+      { name: 'view_dashboard_dosen', description: 'View Dashboard (Dosen)' },
+      { name: 'view_dashboard_mhs', description: 'View Dashboard (Mahasiswa)' },
+      { name: 'manage_users', description: 'Manage Users' },
+      { name: 'manage_roles', description: 'Manage Roles & Permissions' },
       { name: 'manage_master_data', description: 'Kelola data master (prodi, doc type, role)' },
-      { name: 'manage_users', description: 'Kelola data user' },
-      { name: 'manage_repositories', description: 'Kelola repository (upload, edit, hapus)' }
+      { name: 'view_download_logs', description: 'View Download Logs (All)' },
+      { name: 'view_download_logs_prodi', description: 'View Download Logs (Prodi)' },
+      { name: 'view_repo_all', description: 'View All Repositories' },
+      { name: 'view_repo_prodi', description: 'View Prodi Repositories' },
+      { name: 'manage_repositories', description: 'Manage All Repositories' },
+      { name: 'manage_repo_prodi', description: 'Manage Prodi Repositories' },
+      { name: 'create_repo', description: 'Create Repository' },
+      { name: 'edit_own_repo', description: 'Edit Own Repository' },
+      { name: 'approve_repo', description: 'Approve Any Repository' },
+      { name: 'approve_repo_assigned', description: 'Approve Assigned Repository' },
+      { name: 'delete_repo', description: 'Delete Repository' }
     ];
     await db.Permission.bulkCreate(permissionsData, { ignoreDuplicates: true, returning: true });
 
@@ -83,7 +98,9 @@ const seedDatabase = async () => {
       console.log('✅ All permissions assigned to Super Admin');
     }
 
-    console.log('✅ All seeding completed successfully!');
+    // repository dummy logic moved to seed_repos.js
+
+    console.log('✅ All master data seeding completed successfully!');
     process.exit(0);
 
   } catch (error) {

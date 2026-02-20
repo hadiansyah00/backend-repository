@@ -3,12 +3,17 @@ const db = require('../models');
 
 const verifyToken = async (req, res, next) => {
   try {
+    let token;
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ message: 'Akses ditolak: Token tidak valid atau tidak disediakan.' });
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    } else if (req.query.token) {
+      token = req.query.token; // Fallback untuk direct file download via URL
     }
 
-    const token = authHeader.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ message: 'Akses ditolak: Token tidak valid atau tidak disediakan.' });
+    }
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Dapatkan user dengan role dan prodi (exclude password)

@@ -7,6 +7,8 @@ const {
   updateRepository,
   deleteRepository,
   downloadRepository,
+  approveRepository,
+  rejectRepository,
 } = require('../controllers/repositoryController');
 const { verifyToken } = require('../middleware/auth');
 const { authorize } = require('../middleware/authorize');
@@ -209,5 +211,65 @@ router.put('/:id', authorize('manage_repositories'), updateRepository);
  *         description: Repository not found
  */
 router.delete('/:id', authorize('manage_repositories'), deleteRepository);
+/**
+ * @swagger
+ * /repositories/{id}/approve:
+ *   put:
+ *     tags: [Repositories]
+ *     summary: Approve repository
+ *     description: Approve a pending repository and set its status to published. Requires **approve_repo** permission.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *     responses:
+ *       200:
+ *         description: Repository approved
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Not found
+ */
+router.put('/:id/approve', authorize('approve_repo'), approveRepository);
+
+/**
+ * @swagger
+ * /repositories/{id}/reject:
+ *   put:
+ *     tags: [Repositories]
+ *     summary: Reject repository
+ *     description: Reject a pending repository. Requires **approve_repo** permission.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               note:
+ *                 type: string
+ *                 example: Revisi abstrak
+ *     responses:
+ *       200:
+ *         description: Repository rejected
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Not found
+ */
+router.put('/:id/reject', authorize('approve_repo'), rejectRepository);
 
 module.exports = router;

@@ -42,7 +42,10 @@ const getPermissions = async (req, res) => {
 const updateRolePermissions = async (req, res) => {
   try {
     const roleId = req.params.id;
-    const { permissionIds } = req.body; // Array of permission IDs
+    const { permissionIds, permissions } = req.body; // Array of permission IDs or names
+
+    // Frontend might send 'permissions' array instead of 'permissionIds' in RoleService
+    const inputPerms = permissionIds || permissions || [];
 
     const role = await db.Role.findByPk(roleId);
     if (!role) {
@@ -53,8 +56,17 @@ const updateRolePermissions = async (req, res) => {
       return res.status(403).json({ message: 'Super Admin permissions tidak dapat diubah' });
     }
 
+    let finalPermissionIds = inputPerms;
+    if (inputPerms.length > 0 && isNaN(inputPerms[0])) {
+      // Jika yang dikirim adalah string name (misal: 'manage_users')
+      const perms = await db.Permission.findAll({
+        where: { name: inputPerms }
+      });
+      finalPermissionIds = perms.map(p => p.id);
+    }
+
     // Set auto-replaces existing associations in junction table
-    await role.setPermissions(permissionIds || []);
+    await role.setPermissions(finalPermissionIds);
 
     const updatedRole = await db.Role.findByPk(roleId, {
       include: [

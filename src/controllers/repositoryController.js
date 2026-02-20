@@ -23,7 +23,14 @@ const getRepositories = async (req, res) => {
     const where = {};
     if (prodi_id) where.prodi_id = prodi_id;
     if (doc_type_id) where.doc_type_id = doc_type_id;
-    if (status) where.status = status;
+    if (status) {
+      // Map frontend 'pending' or 'Pending Review' to DB 'draft'
+      if (status.toLowerCase().includes('pending')) {
+        where.status = 'draft';
+      } else {
+        where.status = status;
+      }
+    }
     if (search) {
       where[Op.or] = [
         { title: { [Op.iLike]: `%${search}%` } },
@@ -38,7 +45,7 @@ const getRepositories = async (req, res) => {
         { model: db.DocType, as: 'docType', attributes: ['id', 'name', 'slug'] },
         { model: db.User, as: 'uploader', attributes: ['id', 'name', 'email'] }
       ],
-      order: [['created_at', 'DESC']],
+      order: [['createdAt', 'DESC']],
       limit: parseInt(limit),
       offset,
       distinct: true
@@ -55,7 +62,7 @@ const getRepositories = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server Error' });
+    res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
 
@@ -116,7 +123,7 @@ const createRepository = async (req, res) => {
       file_path: req.file.path,
       file_name: req.file.originalname,
       file_size: req.file.size,
-      status: status || 'draft',
+      status: (status && status.toLowerCase() === 'pending review') ? 'draft' : (status || 'draft'),
       prodi_id: prodi_id || null,
       doc_type_id: doc_type_id || null,
       uploaded_by: req.user.id
@@ -158,7 +165,9 @@ const updateRepository = async (req, res) => {
     if (abstract !== undefined) repository.abstract = abstract;
     if (author !== undefined) repository.author = author;
     if (year !== undefined) repository.year = parseInt(year);
-    if (status !== undefined) repository.status = status;
+    if (status !== undefined) {
+      repository.status = (status.toLowerCase() === 'pending review') ? 'draft' : status;
+    }
     if (prodi_id !== undefined) repository.prodi_id = prodi_id;
     if (doc_type_id !== undefined) repository.doc_type_id = doc_type_id;
 
@@ -234,11 +243,62 @@ const downloadRepository = async (req, res) => {
   }
 };
 
+// @desc    Approve repository (Set status to published)
+// @route   PUT /api/repositories/:id/approve
+// @access  Private (approve_repo)
+const approveRepository = async (req, res) => {
+  try {
+    const repository = await db.Repository.findByPk(req.params.id);
+    if (!repository) {
+      return res.status(404).json({ message: 'Repository tidak ditemukan' });
+    }
+
+    repository.status = 'published';
+    await repository.save();
+
+    res.json({ message: `Repository "${repository.title}" berhasil disetujui dan dipublikasikan`, repository });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+// @desc    Reject repository (Set status to rejected)
+// @route   PUT /api/repositories/:id/reject
+// @access  Private (approve_repo)
+const rejectRepository = async (req, res) => {
+  try {
+    const { note } = req.body;
+    
+    const repository = await db.Repository.findByPk(req.params.id);
+    if (!repository) {
+      return res.status(404).json({ message: 'Repository tidak ditemukan' });
+    }
+
+    // If your DB schema supports notes, save it here. Assuming we just set the status for now.
+    // Map rejected -> archived bypass Enum exception
+    repository.status = 'archived';
+    
+    // Todo: Save reject note if there is a column for it. Currently notes are dropped.
+    if(note) {
+      console.log(`Repository rejected with note: ${note}`);
+    }
+    await repository.save();
+
+    res.json({ message: `Repository "${repository.title}" telah ditolak`, repository });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
 module.exports = {
   getRepositories,
   getRepositoryById,
   createRepository,
   updateRepository,
   deleteRepository,
-  downloadRepository
+  downloadRepository,
+  approveRepository,
+  rejectRepository
 };
