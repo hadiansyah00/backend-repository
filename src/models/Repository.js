@@ -44,6 +44,14 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.ENUM('draft', 'pending review', 'published', 'archived', 'rejected'),
       defaultValue: 'draft'
     },
+    reject_note: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    access_level: {
+      type: DataTypes.ENUM('public', 'restricted', 'private'),
+      defaultValue: 'restricted'
+    },
     prodi_id: {
       type: DataTypes.INTEGER,
       allowNull: true,

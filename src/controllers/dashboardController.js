@@ -1,4 +1,5 @@
 const { Repository, User, DownloadLog, ProgramStudi, sequelize } = require('../models');
+const { getSixMonthLineData } = require('../utils/statsHelper');
 
 exports.getDashboardStats = async (req, res) => {
   try {
@@ -67,15 +68,8 @@ exports.getDashboardStats = async (req, res) => {
       total: parseInt(p.dataValues.total, 10) || 0
     })).filter(p => p.total > 0); // optional: only show prodi with > 0 docs
 
-    // 6. Mocked Line Data for Kunjungan & Unduhan since tracking daily views isn't fully in DB yet
-    const lineData = [
-      { name: "Jan", views: 4000, downloads: 2400 },
-      { name: "Feb", views: 3000, downloads: 1398 },
-      { name: "Mar", views: 2000, downloads: 4800 },
-      { name: "Apr", views: 2780, downloads: 3908 },
-      { name: "May", views: 1890, downloads: 4800 },
-      { name: "Jun", views: 2390, downloads: 3800 },
-    ];
+    // 6. Real Line Data for Kunjungan & Unduhan (Last 6 Months)
+    const lineData = await getSixMonthLineData();
 
     res.json({
       success: true,

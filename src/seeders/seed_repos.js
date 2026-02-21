@@ -27,6 +27,7 @@ const seedRepositories = async () => {
         file_path: '/uploads/dummy1.pdf',
         file_size: 1048576, // 1MB
         status: 'published',
+        access_level: 'public',
         prodi_id: prodisList.find(p => p.code === 'S1-F')?.id || prodisList[0].id,
         doc_type_id: docTypes.find(d => d.slug === 'skripsi')?.id || docTypes[0].id,
         uploaded_by: adminUser.id,
@@ -40,6 +41,7 @@ const seedRepositories = async () => {
         file_path: '/uploads/dummy2.pdf',
         file_size: 2048576,
         status: 'published',
+        access_level: 'restricted',
         prodi_id: prodisList.find(p => p.code === 'D3-K')?.id || prodisList[0].id,
         doc_type_id: docTypes.find(d => d.slug === 'kti')?.id || docTypes[0].id,
         uploaded_by: adminUser.id,
@@ -53,6 +55,7 @@ const seedRepositories = async () => {
         file_path: '/uploads/dummy3.pdf',
         file_size: 1548576,
         status: 'published',
+        access_level: 'private',
         prodi_id: prodisList.find(p => p.code === 'S1-G')?.id || prodisList[0].id,
         doc_type_id: docTypes.find(d => d.slug === 'jurnal-penelitian')?.id || docTypes[0].id,
         uploaded_by: adminUser.id,
@@ -70,6 +73,7 @@ const seedRepositories = async () => {
         file_path: `/uploads/dummy${i}.pdf`,
         file_size: 1000000 + (i * 100000),
         status: i % 4 === 0 ? 'draft' : 'published', // Beberapa sengaja di set draft (menunggu persetujuan)
+        access_level: i % 3 === 0 ? 'public' : (i % 2 === 0 ? 'restricted' : 'private'),
         prodi_id: prodisList[i % prodisList.length].id,
         doc_type_id: docTypes[i % docTypes.length].id,
         uploaded_by: adminUser.id,

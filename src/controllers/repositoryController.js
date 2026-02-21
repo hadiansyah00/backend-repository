@@ -2,6 +2,7 @@ const db = require('../models');
 const path = require('path');
 const fs = require('fs');
 const { Op } = require('sequelize');
+const { sendNewSubmissionEmail } = require('../utils/mailer');
 
 // @desc    Get all repositories (paginated, with filters)
 // @route   GET /api/repositories
@@ -29,9 +30,8 @@ const getRepositories = async (req, res) => {
     if (prodi_id) where.prodi_id = prodi_id;
     if (doc_type_id) where.doc_type_id = doc_type_id;
     if (status) {
-      // Map frontend 'pending' or 'Pending Review' to DB 'draft'
       if (status.toLowerCase().includes('pending')) {
-        where.status = 'draft';
+        where.status = 'pending review';
       } else {
         where.status = status;
       }
@@ -115,7 +115,7 @@ const getRepositoryById = async (req, res) => {
 // @access  Private (manage_repositories)
 const createRepository = async (req, res) => {
   try {
-    const { title, abstract, author, npm_nidn, pembimbing1, pembimbing2, year, prodi_id, doc_type_id, status } = req.body;
+    const { title, abstract, author, npm_nidn, pembimbing1, pembimbing2, year, prodi_id, doc_type_id, status, access_level } = req.body;
 
     if (!req.file) {
       return res.status(400).json({ message: 'File wajib diunggah' });
@@ -138,7 +138,8 @@ const createRepository = async (req, res) => {
       file_path: req.file.path,
       file_name: req.file.originalname,
       file_size: req.file.size,
-      status: (status && status.toLowerCase() === 'pending review') ? 'draft' : (status || 'draft'),
+      status: status || 'draft',
+      access_level: access_level || 'restricted',
       prodi_id: prodi_id || null,
       doc_type_id: doc_type_id || null,
       uploaded_by: req.user.id
@@ -154,6 +155,32 @@ const createRepository = async (req, res) => {
     });
 
     res.status(201).json({ message: 'Repository berhasil ditambahkan', repository: result });
+
+    // Send email notification if status is pending review
+    if (result.status === 'pending review') {
+      try {
+        const admins = await db.User.findAll({
+          include: [{
+            model: db.Role,
+            as: 'role',
+            where: {
+              name: {
+                [Op.in]: ['Super Admin', 'Admin']
+              }
+            }
+          }],
+          attributes: ['email']
+        });
+        
+        const adminEmails = admins.map(admin => admin.email).filter(email => email).join(',');
+        
+        if (adminEmails) {
+          sendNewSubmissionEmail(adminEmails, result); // Async, no need to await and block response
+        }
+      } catch (emailError) {
+        console.error('Failed to send email notification:', emailError);
+      }
+    }
   } catch (error) {
     // Hapus file jika terjadi error saat create
     if (req.file && fs.existsSync(req.file.path)) {
@@ -169,7 +196,7 @@ const createRepository = async (req, res) => {
 // @access  Private (manage_repositories)
 const updateRepository = async (req, res) => {
   try {
-    const { title, abstract, author, npm_nidn, pembimbing1, pembimbing2, year, status, prodi_id, doc_type_id } = req.body;
+    const { title, abstract, author, npm_nidn, pembimbing1, pembimbing2, year, status, prodi_id, doc_type_id, access_level } = req.body;
 
     const repository = await db.Repository.findByPk(req.params.id);
     if (!repository) {
@@ -191,10 +218,11 @@ const updateRepository = async (req, res) => {
     if (pembimbing2 !== undefined) repository.pembimbing2 = pembimbing2;
     if (year !== undefined) repository.year = parseInt(year);
     if (status !== undefined) {
-      repository.status = (status.toLowerCase() === 'pending review') ? 'draft' : status;
+      repository.status = status;
     }
     if (prodi_id !== undefined) repository.prodi_id = prodi_id;
     if (doc_type_id !== undefined) repository.doc_type_id = doc_type_id;
+    if (access_level !== undefined) repository.access_level = access_level;
 
     await repository.save();
 
@@ -208,6 +236,32 @@ const updateRepository = async (req, res) => {
     });
 
     res.json({ message: 'Repository berhasil diperbarui', repository: result });
+
+    // Send email notification if status changed to pending review
+    if (status === 'pending review') {
+      try {
+        const admins = await db.User.findAll({
+          include: [{
+            model: db.Role,
+            as: 'role',
+            where: {
+              name: {
+                [Op.in]: ['Super Admin', 'Admin']
+              }
+            }
+          }],
+          attributes: ['email']
+        });
+        
+        const adminEmails = admins.map(admin => admin.email).filter(email => email).join(',');
+        
+        if (adminEmails) {
+          sendNewSubmissionEmail(adminEmails, result); // Async, no need to await and block response
+        }
+      } catch (emailError) {
+        console.error('Failed to send email notification:', emailError);
+      }
+    }
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
@@ -261,6 +315,17 @@ const downloadRepository = async (req, res) => {
       return res.status(404).json({ message: 'File tidak ditemukan di server' });
     }
 
+    // Enforce download rules based on access_level
+    // If it's private, only the uploader or admins can download it
+    if (repository.access_level === 'private') {
+      const isOwner = repository.uploaded_by === req.user.id;
+      const isAdmin = req.user.role && req.user.role.slug !== 'mahasiswa' && req.user.role.slug !== 'dosen'; // Simplistic admin check based on existing logic
+      
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ message: 'Akses ditolak: Repositori bersifat privat dan hanya dapat diakses oleh pemilik atau admin.' });
+      }
+    }
+
     // Buat download log
     await db.DownloadLog.create({
       repository_id: repository.id,
@@ -308,12 +373,11 @@ const rejectRepository = async (req, res) => {
     }
 
     // If your DB schema supports notes, save it here. Assuming we just set the status for now.
-    // Map rejected -> archived bypass Enum exception
-    repository.status = 'archived';
+    repository.status = 'rejected';
     
-    // Todo: Save reject note if there is a column for it. Currently notes are dropped.
+    // Save reject note
     if(note) {
-      console.log(`Repository rejected with note: ${note}`);
+      repository.reject_note = note;
     }
     await repository.save();
 
