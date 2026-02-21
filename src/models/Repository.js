@@ -12,6 +12,18 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: false
     },
+    npm_nidn: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    pembimbing1: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    pembimbing2: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
     year: {
       type: DataTypes.INTEGER,
       allowNull: true

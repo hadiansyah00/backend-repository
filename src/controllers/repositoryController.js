@@ -21,6 +21,11 @@ const getRepositories = async (req, res) => {
 
     // Build where clause dynamically
     const where = {};
+    
+    // Jika user adalah mahasiswa, hanya bisa melihat miliknya sendiri
+    if (req.user && req.user.role && req.user.role.slug === 'mahasiswa') {
+      where.uploaded_by = req.user.id;
+    }
     if (prodi_id) where.prodi_id = prodi_id;
     if (doc_type_id) where.doc_type_id = doc_type_id;
     if (status) {
@@ -83,6 +88,13 @@ const getRepositoryById = async (req, res) => {
       return res.status(404).json({ message: 'Repository tidak ditemukan' });
     }
 
+    // Jika user adalah mahasiswa, dia hanya boleh melihat repositori miliknya sendiri
+    if (req.user && req.user.role && req.user.role.slug === 'mahasiswa') {
+      if (repository.uploaded_by !== req.user.id) {
+        return res.status(403).json({ message: 'Anda tidak memiliki akses ke repositori ini' });
+      }
+    }
+
     // Hitung jumlah download
     const downloadCount = await db.DownloadLog.count({
       where: { repository_id: repository.id }
@@ -103,7 +115,7 @@ const getRepositoryById = async (req, res) => {
 // @access  Private (manage_repositories)
 const createRepository = async (req, res) => {
   try {
-    const { title, abstract, author, year, prodi_id, doc_type_id, status } = req.body;
+    const { title, abstract, author, npm_nidn, pembimbing1, pembimbing2, year, prodi_id, doc_type_id, status } = req.body;
 
     if (!req.file) {
       return res.status(400).json({ message: 'File wajib diunggah' });
@@ -119,6 +131,9 @@ const createRepository = async (req, res) => {
       title,
       abstract: abstract || null,
       author,
+      npm_nidn: npm_nidn || null,
+      pembimbing1: pembimbing1 || null,
+      pembimbing2: pembimbing2 || null,
       year: year ? parseInt(year) : null,
       file_path: req.file.path,
       file_name: req.file.originalname,
@@ -154,16 +169,26 @@ const createRepository = async (req, res) => {
 // @access  Private (manage_repositories)
 const updateRepository = async (req, res) => {
   try {
-    const { title, abstract, author, year, status, prodi_id, doc_type_id } = req.body;
+    const { title, abstract, author, npm_nidn, pembimbing1, pembimbing2, year, status, prodi_id, doc_type_id } = req.body;
 
     const repository = await db.Repository.findByPk(req.params.id);
     if (!repository) {
       return res.status(404).json({ message: 'Repository tidak ditemukan' });
     }
 
+    // Periksa kepemilikan jika user adalah mahasiswa
+    if (req.user && req.user.role && req.user.role.slug === 'mahasiswa') {
+      if (repository.uploaded_by !== req.user.id) {
+        return res.status(403).json({ message: 'Anda hanya dapat mengubah repositori milik Anda sendiri' });
+      }
+    }
+
     if (title !== undefined) repository.title = title;
     if (abstract !== undefined) repository.abstract = abstract;
     if (author !== undefined) repository.author = author;
+    if (npm_nidn !== undefined) repository.npm_nidn = npm_nidn;
+    if (pembimbing1 !== undefined) repository.pembimbing1 = pembimbing1;
+    if (pembimbing2 !== undefined) repository.pembimbing2 = pembimbing2;
     if (year !== undefined) repository.year = parseInt(year);
     if (status !== undefined) {
       repository.status = (status.toLowerCase() === 'pending review') ? 'draft' : status;
@@ -197,6 +222,13 @@ const deleteRepository = async (req, res) => {
     const repository = await db.Repository.findByPk(req.params.id);
     if (!repository) {
       return res.status(404).json({ message: 'Repository tidak ditemukan' });
+    }
+
+    // Periksa kepemilikan jika user adalah mahasiswa
+    if (req.user && req.user.role && req.user.role.slug === 'mahasiswa') {
+      if (repository.uploaded_by !== req.user.id) {
+        return res.status(403).json({ message: 'Anda hanya dapat menghapus repositori milik Anda sendiri' });
+      }
     }
 
     // Hapus file fisik jika masih ada
